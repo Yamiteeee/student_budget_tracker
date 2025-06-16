@@ -5,15 +5,16 @@ import 'package:intl/intl.dart';
 import 'package:student_budget_tracker/models/expense.dart';
 import 'package:student_budget_tracker/services/firestore_service.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:student_budget_tracker/screens/reports_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
-  final VoidCallback toggleThemeMode; // Add this callback for theme toggling
+  final VoidCallback toggleThemeMode;
 
   const HomeScreen({
     Key? key,
     required this.userId,
-    required this.toggleThemeMode, // Require it in the constructor
+    required this.toggleThemeMode,
   }) : super(key: key);
 
   @override
@@ -128,33 +129,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(locale: 'en_US', symbol: '₱');
+    final formatter = NumberFormat.currency(
+      locale: 'en_US',
+      symbol: '₱',
+      decimalDigits: amount.truncateToDouble() == amount ? 0 : 2,
+    );
     return formatter.format(amount);
   }
 
   Map<String, double> _getCategorySummary(List<Expense> expenses, String period) {
     final Map<String, double> summary = {};
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
 
     for (var expense in expenses) {
-      final expenseDateNormalized = DateTime(expense.date.year, expense.date.month, expense.date.day);
-
       bool include = false;
-      if (period == 'daily') {
-        if (expenseDateNormalized.isAtSameMomentAs(today)) {
-          include = true;
-        }
-      } else if (period == 'weekly') {
-        final int currentWeekday = today.weekday;
-        final DateTime startOfWeek = today.subtract(Duration(days: currentWeekday % 7));
 
-        if (expenseDateNormalized.isAfter(startOfWeek) || expenseDateNormalized.isAtSameMomentAs(startOfWeek)) {
-          final Duration diff = expenseDateNormalized.difference(startOfWeek);
-          if (diff.inDays >= 0 && diff.inDays <= 6) {
+      switch (period) {
+        case 'daily':
+          final today = DateTime(now.year, now.month, now.day);
+          final expenseDateNormalized = DateTime(expense.date.year, expense.date.month, expense.date.day);
+          if (expenseDateNormalized.isAtSameMomentAs(today)) {
             include = true;
           }
-        }
+          break;
+        case 'weekly':
+          final todayNormalized = DateTime(now.year, now.month, now.day);
+          final int currentWeekday = todayNormalized.weekday;
+          final DateTime startOfWeek = todayNormalized.subtract(Duration(days: currentWeekday % 7));
+
+          final expenseDateNormalized = DateTime(expense.date.year, expense.date.month, expense.date.day);
+          if (expenseDateNormalized.isAfter(startOfWeek) || expenseDateNormalized.isAtSameMomentAs(startOfWeek)) {
+            final Duration diff = expenseDateNormalized.difference(startOfWeek);
+            if (diff.inDays >= 0 && diff.inDays <= 6) {
+              include = true;
+            }
+          }
+          break;
+        case 'monthly':
+          if (expense.date.year == now.year && expense.date.month == now.month) {
+            include = true;
+          }
+          break;
+        case 'annually':
+          if (expense.date.year == now.year) {
+            include = true;
+          }
+          break;
       }
 
       if (include) {
@@ -186,22 +206,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine current brightness to change icon dynamically
     final Brightness currentBrightness = Theme.of(context).brightness;
     final IconData themeIcon = currentBrightness == Brightness.dark ? Icons.light_mode : Icons.dark_mode;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Student Budget Tracker'),
+        title: const Text('Budget Tracker'),
         centerTitle: true,
         actions: [
-          // Theme Toggle Button
           IconButton(
             icon: Icon(themeIcon),
-            onPressed: widget.toggleThemeMode, // Call the passed callback
+            onPressed: widget.toggleThemeMode,
             tooltip: 'Toggle Theme',
           ),
-          // User ID display removed from here
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ReportsScreen(userId: widget.userId),
+                ),
+              );
+            },
+            tooltip: 'View Past Reports',
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -209,10 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User ID Display removed from here
-            // const SizedBox(height: 20), // Remove or reduce this space if the User ID section was here
-
-            // Add Expense Form (ALWAYS VISIBLE)
+            // Add Expense Form
             Card(
               elevation: 5,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -231,14 +257,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Amount (₱)',
                           hintText: 'e.g., 15.50',
-                          prefixIcon: Padding(
-                            padding: EdgeInsets.only(left: 12.0, right: 8.0, top: 4.0),
-                            child: Text(
-                              '₱',
-                              style: TextStyle(
-                                fontSize: 20,
-                                color: Colors.greenAccent,
-                                fontWeight: FontWeight.bold,
+                          prefixIcon: SizedBox(
+                            width: 36,
+                            child: Center(
+                              child: Text(
+                                '₱',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.greenAccent,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -287,7 +315,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ListTile(
                         title: Text(
                           'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
-                          // Text color will adapt based on the overall theme TextTheme
                         ),
                         trailing: const Icon(Icons.calendar_today, color: Colors.tealAccent),
                         onTap: () async {
@@ -301,14 +328,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               return Theme(
                                 data: currentTheme.copyWith(
                                   colorScheme: currentTheme.colorScheme.copyWith(
-                                    primary: Colors.deepPurpleAccent, // Header background
-                                    onPrimary: Colors.white, // Header text
-                                    onSurface: currentTheme.brightness == Brightness.dark ? Colors.white : Colors.black87, // Calendar text
-                                    surface: currentTheme.brightness == Brightness.dark ? Colors.grey[800]! : Colors.white, // Calendar background
+                                    primary: Colors.deepPurpleAccent,
+                                    onPrimary: Colors.white,
+                                    onSurface: currentTheme.brightness == Brightness.dark ? Colors.white : Colors.black87,
+                                    surface: currentTheme.brightness == Brightness.dark ? Colors.grey[800]! : Colors.white,
                                   ),
                                   textButtonTheme: TextButtonThemeData(
                                     style: TextButton.styleFrom(
-                                      foregroundColor: Colors.deepPurpleAccent, // Button text color
+                                      foregroundColor: Colors.deepPurpleAccent,
                                     ),
                                   ),
                                 ),
@@ -367,71 +394,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 final List<Expense> expenses = snapshot.data!;
                 final dailySummary = _getCategorySummary(expenses, 'daily');
                 final weeklySummary = _getCategorySummary(expenses, 'weekly');
+                final monthlySummary = _getCategorySummary(expenses, 'monthly');
+                final annuallySummary = _getCategorySummary(expenses, 'annually');
+
                 final double totalDaily = dailySummary.values.fold(0, (sum, item) => sum + item);
                 final double totalWeekly = weeklySummary.values.fold(0, (sum, item) => sum + item);
+                final double totalMonthly = monthlySummary.values.fold(0, (sum, item) => sum + item);
+                final double totalAnnually = annuallySummary.values.fold(0, (sum, item) => sum + item);
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Summary Section
+                    // Summary Sections (Daily, Weekly, Monthly, Annually)
                     Row(
                       children: [
-                        Expanded(
-                          child: Card(
-                            elevation: 5,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(15.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Today\'s Expenses', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _formatCurrency(totalDaily),
-                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.lightGreenAccent),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  ...dailySummary.entries.map((entry) => Text(
-                                    '${entry.key}: ${_formatCurrency(entry.value)}',
-                                    style: Theme.of(context).textTheme.bodyMedium, // Use theme's text color
-                                  )),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                        Expanded(child: _buildSummaryCard('Today\'s Expenses', totalDaily, dailySummary, Colors.orangeAccent)),
                         const SizedBox(width: 15),
-                        Expanded(
-                          child: Card(
-                            elevation: 5,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(15.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('This Week\'s Expenses', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _formatCurrency(totalWeekly),
-                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.lightGreenAccent),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  ...weeklySummary.entries.map((entry) => Text(
-                                    '${entry.key}: ${_formatCurrency(entry.value)}',
-                                    style: Theme.of(context).textTheme.bodyMedium, // Use theme's text color
-                                  )),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                        Expanded(child: _buildSummaryCard('This Week\'s Expenses', totalWeekly, weeklySummary, Colors.orangeAccent)),
                       ],
                     ),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(child: _buildSummaryCard('This Month\'s Expenses', totalMonthly, monthlySummary, Colors.blueAccent)),
+                        const SizedBox(width: 15),
+                        Expanded(child: _buildSummaryCard('This Year\'s Expenses', totalAnnually, annuallySummary, Colors.greenAccent)),
+                      ],
+                    ),
+
                     const SizedBox(height: 25),
 
-                    // Charts Section
+                    // Charts Section (Weekly)
                     Card(
                       elevation: 5,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -472,7 +465,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             final categoryName = weeklySummary.keys.elementAt(value.toInt());
                                             return Padding(
                                               padding: const EdgeInsets.only(top: 8.0),
-                                              child: Text(categoryName, style: Theme.of(context).textTheme.bodySmall), // Use theme's text color
+                                              child: Text(categoryName, style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 9)),
                                             );
                                           },
                                           reservedSize: 30,
@@ -482,9 +475,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                         sideTitles: SideTitles(
                                           showTitles: true,
                                           getTitlesWidget: (value, meta) {
-                                            return Text(_formatCurrency(value), style: Theme.of(context).textTheme.bodySmall); // Use theme's text color
+                                            return Text(_formatCurrency(value), style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 9));
                                           },
-                                          reservedSize: 40,
+                                          reservedSize: 45,
                                         ),
                                       ),
                                       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -518,21 +511,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                       final mapEntry = entry.value;
                                       final color = Colors.primaries[index % Colors.primaries.length];
                                       final percentage = (mapEntry.value / totalWeekly * 100);
+                                      // Only show title if slice is significant enough, otherwise it clutters.
+                                      // You can adjust the 5.0% threshold.
+                                      final String titleText = percentage > 5.0
+                                          ? '${mapEntry.key}\n${percentage.toStringAsFixed(1)}%'
+                                          : '${percentage.toStringAsFixed(1)}%'; // Show only percentage for very small slices
+
                                       return PieChartSectionData(
                                         color: color,
                                         value: mapEntry.value,
-                                        title: '${mapEntry.key}\n${percentage.toStringAsFixed(1)}%',
-                                        radius: 70,
+                                        title: titleText,
+                                        radius: 80, // Increased radius for more space
                                         titleStyle: const TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 10, // Adjusted font size
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
-                                        titlePositionPercentageOffset: 0.55,
+                                        titlePositionPercentageOffset: 0.6, // Adjusted position further out
                                       );
                                     }).toList(),
-                                    sectionsSpace: 2,
-                                    centerSpaceRadius: 40,
+                                    sectionsSpace: 4, // Increased space between sections for better visual separation
+                                    centerSpaceRadius: 50, // Increased center hole size
                                     borderData: FlBorderData(show: false),
                                   ),
                                 ),
@@ -570,7 +569,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   margin: const EdgeInsets.symmetric(vertical: 8),
                                   elevation: 2,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  // Card color will now be controlled by the theme's cardColor
                                   child: ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: Colors.deepPurpleAccent.withOpacity(0.2),
@@ -578,18 +576,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     title: Text(
                                       '${expense.category}: ${_formatCurrency(expense.amount)}',
-                                      style: Theme.of(context).textTheme.titleMedium, // Use theme's text color
+                                      style: Theme.of(context).textTheme.titleMedium,
                                     ),
                                     subtitle: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           expense.description ?? 'No description',
-                                          style: Theme.of(context).textTheme.bodyMedium, // Use theme's text color
+                                          style: Theme.of(context).textTheme.bodyMedium,
                                         ),
                                         Text(
-                                          DateFormat('MMM d, EEEE').format(expense.date), // Changed YYYY to EEEE for day of week
-                                          style: Theme.of(context).textTheme.bodySmall, // Use theme's text color
+                                          DateFormat('MMM d, EEEE').format(expense.date),
+                                          style: Theme.of(context).textTheme.bodySmall,
                                         ),
                                       ],
                                     ),
@@ -609,6 +607,41 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper widget to build consistent summary cards
+  Widget _buildSummaryCard(String title, double total, Map<String, double> summary, Color titleColor) {
+    final sortedEntries = summary.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Card(
+      elevation: 5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Padding(
+        padding: const EdgeInsets.all(15.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
+            const SizedBox(height: 8),
+            Text(
+              _formatCurrency(total),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.lightGreenAccent),
+            ),
+            const SizedBox(height: 10),
+            ...sortedEntries.take(3).map((entry) => Text(
+              '${entry.key}: ${_formatCurrency(entry.value)}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            )),
+            if (sortedEntries.length > 3)
+              Text(
+                'Other categories...',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
           ],
         ),
       ),

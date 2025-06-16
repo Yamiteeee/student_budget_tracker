@@ -6,32 +6,45 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0' # Updated SDK constraint for broader compatibility
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-
-  # Firebase Core for app initialization
   firebase_core: ^2.27.0
-  # Firebase Authentication for user management (anonymous sign-in)
   firebase_auth: ^4.17.8
-  # Cloud Firestore for database
   cloud_firestore: ^4.15.8
-  # For charting
   fl_chart: ^0.68.0
-  # For date formatting (like in summaries)
   intl: ^0.19.0
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: "^0.13.1" # Version is good
 
 
 flutter:
   uses-material-design: true
+
+  # Ensure assets are declared correctly.
+  # The path must end with a '/' if it's a directory,
+  # or be the full path to the file if it's a single file.
+  assets:
+    - assets/pie.png # <--- CORRECTED: Specify the full path including the folder
+    # If you put it in a subfolder like 'assets/images/', you'd list 'assets/images/'
+    # - assets/images/  # Example if you had a 'images' subfolder
+
+# IMPORTANT: This section must be at the very bottom of the pubspec.yaml file,
+# and its indentation must match 'flutter:' (no leading spaces).
+flutter_launcher_icons:
+  android: "launcher_icon" # Set to true or "launcher_icon"
+  ios: true # Set to true to generate for iOS
+  image_path: "assets/pie.png" # <--- IMPORTANT: This path MUST match the assets declaration
+  min_sdk_android: 21 # You should verify your actual min SDK in android/app/build.gradle
+  # Example: If you want an adaptive icon for Android (recommended for modern Android)
+  # adaptive_icon_background: "#FFFFFF" # A solid color for the background
+  # adaptive_icon_foreground: "assets/pie.png" # The part of your icon that will be foreground

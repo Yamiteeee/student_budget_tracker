@@ -50,7 +50,6 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  // Toggles between light and dark theme
   void _toggleThemeMode() {
     setState(() {
       _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
@@ -60,20 +59,20 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Student Budget Tracker',
-      debugShowCheckedModeBanner: false, // Removed debug banner
-      themeMode: _themeMode, // Use the theme mode state
-      theme: ThemeData( // --- LIGHT THEME ---
+      title: 'Budget Tracker', // <--- Changed title here
+      debugShowCheckedModeBanner: false,
+      themeMode: _themeMode,
+      theme: ThemeData(
         primarySwatch: Colors.deepPurple,
-        brightness: Brightness.light, // Explicitly light brightness
-        scaffoldBackgroundColor: const Color(0xFFF0F0F0), // Light grey, not pure white
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF0F0F0),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.deepPurple, // AppBar color for light theme
+          backgroundColor: Colors.deepPurple,
           foregroundColor: Colors.white,
         ),
-        cardColor: const Color(0xFFE0E0E0), // Slightly darker card for light theme
+        cardColor: const Color(0xFFE0E0E0),
         textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.black87), // Dark text for light theme
+          bodyLarge: TextStyle(color: Colors.black87),
           bodyMedium: TextStyle(color: Colors.black54),
           titleLarge: TextStyle(color: Colors.black),
           titleMedium: TextStyle(color: Colors.black87),
@@ -84,7 +83,7 @@ class _MyAppState extends State<MyApp> {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.grey[200], // Lighter fill for light theme inputs
+          fillColor: Colors.grey[200],
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8.0),
             borderSide: BorderSide.none,
@@ -102,7 +101,7 @@ class _MyAppState extends State<MyApp> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         ),
       ),
-      darkTheme: ThemeData( // --- DARK THEME ---
+      darkTheme: ThemeData(
         primarySwatch: Colors.deepPurple,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.grey[900],
@@ -155,7 +154,7 @@ class _MyAppState extends State<MyApp> {
       )
           : HomeScreen(
         userId: _userId!,
-        toggleThemeMode: _toggleThemeMode, // Pass the theme toggle function
+        toggleThemeMode: _toggleThemeMode,
       ),
     );
   }
