@@ -1,0 +1,37 @@
+name: student_budget_tracker
+description: "A new Flutter project."
+
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0' # Updated SDK constraint for broader compatibility
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Firebase Core for app initialization
+  firebase_core: ^2.27.0
+  # Firebase Authentication for user management (anonymous sign-in)
+  firebase_auth: ^4.17.8
+  # Cloud Firestore for database
+  cloud_firestore: ^4.15.8
+  # For charting
+  fl_chart: ^0.68.0
+  # For date formatting (like in summaries)
+  intl: ^0.19.0
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+
+flutter:
+  uses-material-design: true
