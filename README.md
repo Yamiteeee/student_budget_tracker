@@ -6,11 +6,10 @@ This is an app developed **for fun**, learning, and showcasing Flutter developme
 
 ## ✨ Features
 
--   **User Authentication:** Secure login/registration using Firebase Authentication (Email/Password).
 -   **Expense Tracking:** Add, view, and manage daily expenses.
 -   **Categorization:** Organize expenses by category.
 -   **Data Persistence:** Expense data is stored securely in Firebase Firestore.
--   **Cross-Platform:** Built with Flutter for Android, iOS, Web, and Desktop support.
+-   **Cross-Platform:** Built with Flutter for Android
 
 
 
