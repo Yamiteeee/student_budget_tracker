@@ -6,6 +6,8 @@ import 'package:student_budget_tracker/models/expense.dart';
 import 'package:student_budget_tracker/services/firestore_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:student_budget_tracker/screens/reports_screen.dart';
+import 'package:student_budget_tracker/screens/budget_planner_screen.dart';
+import 'package:student_budget_tracker/models/category.dart'; // NEW: Import Category model
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -25,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  String _selectedCategory = 'Food';
+  String? _selectedCategory; // Change to nullable initially
   DateTime _selectedDate = DateTime.now();
   bool _isAddingExpense = false;
 
@@ -59,22 +61,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _addExpense() async {
     if (_formKey.currentState!.validate()) {
+      final double? amount = double.tryParse(_amountController.text);
+      if (amount == null || amount <= 0) {
+        _showMessage('Please enter a valid positive amount.', isError: true);
+        return;
+      }
+      if (_selectedCategory == null || _selectedCategory!.isEmpty) {
+        _showMessage('Please select a category.', isError: true);
+        return;
+      }
+
       setState(() {
         _isAddingExpense = true;
       });
 
-      final double? amount = double.tryParse(_amountController.text);
-      if (amount == null || amount <= 0) {
-        _showMessage('Please enter a valid amount.', isError: true);
-        setState(() { _isAddingExpense = false; });
-        return;
-      }
-
       try {
         final newExpense = Expense(
-          id: '',
+          id: '', // Firestore will generate this
           amount: amount,
-          category: _selectedCategory,
+          category: _selectedCategory!,
           description: _descriptionController.text.isEmpty
               ? null
               : _descriptionController.text,
@@ -147,7 +152,8 @@ class _HomeScreenState extends State<HomeScreen> {
       switch (period) {
         case 'daily':
           final today = DateTime(now.year, now.month, now.day);
-          final expenseDateNormalized = DateTime(expense.date.year, expense.date.month, expense.date.day);
+          final expenseDateNormalized =
+          DateTime(expense.date.year, expense.date.month, expense.date.day);
           if (expenseDateNormalized.isAtSameMomentAs(today)) {
             include = true;
           }
@@ -155,14 +161,16 @@ class _HomeScreenState extends State<HomeScreen> {
         case 'weekly':
           final todayNormalized = DateTime(now.year, now.month, now.day);
           final int currentWeekday = todayNormalized.weekday;
-          final DateTime startOfWeek = todayNormalized.subtract(Duration(days: currentWeekday % 7));
+          // Adjust to start week on Monday (1) or Sunday (7). Assuming Monday:
+          final DateTime startOfWeek =
+          todayNormalized.subtract(Duration(days: currentWeekday == 7 ? 6 : currentWeekday - 1)); // Mon=1, Sun=7. If Sun, go back 6 days. Else, currentWeekday-1 days.
 
-          final expenseDateNormalized = DateTime(expense.date.year, expense.date.month, expense.date.day);
-          if (expenseDateNormalized.isAfter(startOfWeek) || expenseDateNormalized.isAtSameMomentAs(startOfWeek)) {
-            final Duration diff = expenseDateNormalized.difference(startOfWeek);
-            if (diff.inDays >= 0 && diff.inDays <= 6) {
-              include = true;
-            }
+          final expenseDateNormalized =
+          DateTime(expense.date.year, expense.date.month, expense.date.day);
+          if ((expenseDateNormalized.isAfter(startOfWeek) ||
+              expenseDateNormalized.isAtSameMomentAs(startOfWeek)) &&
+              expenseDateNormalized.isBefore(startOfWeek.add(const Duration(days: 7)))) {
+            include = true;
           }
           break;
         case 'monthly':
@@ -204,10 +212,63 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // NEW: Dialog to add a new category
+  Future<void> _showAddCategoryDialog() async {
+    final TextEditingController newCategoryController = TextEditingController();
+    final String? newCategory = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Add New Category'),
+          content: TextField(
+            controller: newCategoryController,
+            decoration: const InputDecoration(hintText: 'Category Name'),
+            autofocus: true,
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(null),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final String categoryName = newCategoryController.text.trim();
+                if (categoryName.isNotEmpty) {
+                  Navigator.of(dialogContext).pop(categoryName);
+                } else {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(content: Text('Category name cannot be empty.'), backgroundColor: Colors.red),
+                  );
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newCategory != null && newCategory.isNotEmpty) {
+      try {
+        await _firestoreService.addCategory(newCategory);
+        _showMessage('Category "$newCategory" added successfully!');
+        setState(() {
+          _selectedCategory = newCategory; // Automatically select the newly added category
+        });
+      } catch (e) {
+        String errorMessage = e.toString().split(':').last.trim();
+        _showMessage('Failed to add category: $errorMessage', isError: true);
+      }
+    }
+    newCategoryController.dispose();
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final Brightness currentBrightness = Theme.of(context).brightness;
-    final IconData themeIcon = currentBrightness == Brightness.dark ? Icons.light_mode : Icons.dark_mode;
+    final IconData themeIcon =
+    currentBrightness == Brightness.dark ? Icons.light_mode : Icons.dark_mode;
 
     return Scaffold(
       appBar: AppBar(
@@ -231,6 +292,18 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             tooltip: 'View Past Reports',
           ),
+          IconButton(
+            icon: const Icon(Icons.wallet),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BudgetPlannerScreen(userId: widget.userId),
+                ),
+              );
+            },
+            tooltip: 'Plan Budgets',
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -249,7 +322,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Add New Expense', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.deepPurpleAccent)),
+                      const Text('Add New Expense',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepPurpleAccent)),
                       const SizedBox(height: 15),
                       TextFormField(
                         controller: _amountController,
@@ -275,32 +352,88 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter an amount';
                           }
-                          if (double.tryParse(value) == null || double.parse(value) <= 0) {
+                          if (double.tryParse(value) == null ||
+                              double.parse(value) <= 0) {
                             return 'Please enter a valid positive number';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 15),
-                      DropdownButtonFormField<String>(
-                        value: _selectedCategory,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          prefixIcon: Icon(Icons.category, color: Colors.orangeAccent),
-                        ),
-                        items: <String>[
-                          'Food', 'Transport', 'Entertainment', 'Study', 'Rent', 'Utilities', 'Other'
-                        ].map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _selectedCategory = newValue!;
-                          });
-                        },
+                      // NEW: Category Dropdown with Add Button
+                      Row(
+                        children: [
+                          Expanded(
+                            child: StreamBuilder<List<Category>>(
+                              stream: _firestoreService.getCategories(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const CircularProgressIndicator();
+                                }
+                                if (snapshot.hasError) {
+                                  return Text('Error loading categories: ${snapshot.error}');
+                                }
+                                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                  // Inform user to add a category if none exist
+                                  return const Text('No categories available. Please add one.');
+                                }
+
+                                List<String> categoryNames = snapshot.data!.map((c) => c.name).toList();
+
+                                // Ensure _selectedCategory is a valid value from the fetched list
+                                // If _selectedCategory is null or not in the current list, set to the first category
+                                if (_selectedCategory == null || !categoryNames.contains(_selectedCategory)) {
+                                  // Use addPostFrameCallback to avoid calling setState during build
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted && categoryNames.isNotEmpty) {
+                                      setState(() {
+                                        _selectedCategory = categoryNames.first;
+                                      });
+                                    }
+                                  });
+                                }
+
+                                return DropdownButtonFormField<String>(
+                                  value: _selectedCategory,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Category',
+                                    prefixIcon: Icon(Icons.category, color: Colors.orangeAccent),
+                                  ),
+                                  items: categoryNames.map<DropdownMenuItem<String>>((String value) {
+                                    return DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value),
+                                    );
+                                  }).toList(),
+                                  onChanged: (String? newValue) {
+                                    setState(() {
+                                      _selectedCategory = newValue!;
+                                    });
+                                  },
+                                  // Validator for dropdown
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please select a category';
+                                    }
+                                    return null;
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurpleAccent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.add, color: Colors.white),
+                              onPressed: _showAddCategoryDialog,
+                              tooltip: 'Add New Category',
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 15),
                       TextFormField(
@@ -316,7 +449,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: Text(
                           'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
                         ),
-                        trailing: const Icon(Icons.calendar_today, color: Colors.tealAccent),
+                        trailing:
+                        const Icon(Icons.calendar_today, color: Colors.tealAccent),
                         onTap: () async {
                           DateTime? pickedDate = await showDatePicker(
                             context: context,
@@ -330,8 +464,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   colorScheme: currentTheme.colorScheme.copyWith(
                                     primary: Colors.deepPurpleAccent,
                                     onPrimary: Colors.white,
-                                    onSurface: currentTheme.brightness == Brightness.dark ? Colors.white : Colors.black87,
-                                    surface: currentTheme.brightness == Brightness.dark ? Colors.grey[800]! : Colors.white,
+                                    onSurface: currentTheme.brightness == Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black87,
+                                    surface: currentTheme.brightness == Brightness.dark
+                                        ? Colors.grey[800]!
+                                        : Colors.white,
                                   ),
                                   textButtonTheme: TextButtonThemeData(
                                     style: TextButton.styleFrom(
@@ -361,7 +499,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.deepPurpleAccent,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 30, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -381,44 +520,47 @@ class _HomeScreenState extends State<HomeScreen> {
             StreamBuilder<List<Expense>>(
               stream: _firestoreService.getExpenses(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)));
-                }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Center(child: Text('No expenses recorded yet.'));
                 }
-
                 final List<Expense> expenses = snapshot.data!;
                 final dailySummary = _getCategorySummary(expenses, 'daily');
                 final weeklySummary = _getCategorySummary(expenses, 'weekly');
                 final monthlySummary = _getCategorySummary(expenses, 'monthly');
                 final annuallySummary = _getCategorySummary(expenses, 'annually');
-
-                final double totalDaily = dailySummary.values.fold(0, (sum, item) => sum + item);
-                final double totalWeekly = weeklySummary.values.fold(0, (sum, item) => sum + item);
-                final double totalMonthly = monthlySummary.values.fold(0, (sum, item) => sum + item);
-                final double totalAnnually = annuallySummary.values.fold(0, (sum, item) => sum + item);
-
+                final double totalDaily =
+                dailySummary.values.fold(0, (sum, item) => sum + item);
+                final double totalWeekly =
+                weeklySummary.values.fold(0, (sum, item) => sum + item);
+                final double totalMonthly =
+                monthlySummary.values.fold(0, (sum, item) => sum + item);
+                final double totalAnnually =
+                annuallySummary.values.fold(0, (sum, item) => sum + item);
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Summary Sections (Daily, Weekly, Monthly, Annually)
                     Row(
                       children: [
-                        Expanded(child: _buildSummaryCard('Today\'s Expenses', totalDaily, dailySummary, Colors.orangeAccent)),
+                        Expanded(
+                            child: _buildSummaryCard('Today\'s Expenses', totalDaily,
+                                dailySummary, Colors.orangeAccent)),
                         const SizedBox(width: 15),
-                        Expanded(child: _buildSummaryCard('This Week\'s Expenses', totalWeekly, weeklySummary, Colors.orangeAccent)),
+                        Expanded(
+                            child: _buildSummaryCard('This Week\'s Expenses', totalWeekly,
+                                weeklySummary, Colors.orangeAccent)),
                       ],
                     ),
                     const SizedBox(height: 15),
                     Row(
                       children: [
-                        Expanded(child: _buildSummaryCard('This Month\'s Expenses', totalMonthly, monthlySummary, Colors.blueAccent)),
+                        Expanded(
+                            child: _buildSummaryCard('This Month\'s Expenses', totalMonthly,
+                                monthlySummary, Colors.blueAccent)),
                         const SizedBox(width: 15),
-                        Expanded(child: _buildSummaryCard('This Year\'s Expenses', totalAnnually, annuallySummary, Colors.greenAccent)),
+                        Expanded(
+                            child: _buildSummaryCard('This Year\'s Expenses', totalAnnually,
+                                annuallySummary, Colors.greenAccent)),
                       ],
                     ),
 
@@ -433,7 +575,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Expense Breakdown (Weekly)', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.tealAccent)),
+                            const Text('Expense Breakdown (Weekly)',
+                                style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.tealAccent)),
                             const SizedBox(height: 15),
                             // Bar Chart
                             if (weeklySummary.isNotEmpty)
@@ -441,7 +587,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 height: 200,
                                 child: BarChart(
                                   BarChartData(
-                                    barGroups: weeklySummary.entries.toList().asMap().entries.map((entry) {
+                                    barGroups: weeklySummary.entries
+                                        .toList()
+                                        .asMap()
+                                        .entries
+                                        .map((entry) {
                                       final index = entry.key;
                                       final mapEntry = entry.value;
                                       return BarChartGroupData(
@@ -449,7 +599,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         barRods: [
                                           BarChartRodData(
                                             toY: mapEntry.value,
-                                            color: Colors.primaries[index % Colors.primaries.length],
+                                            color: Colors.primaries[
+                                            index % Colors.primaries.length],
                                             width: 16,
                                             borderRadius: BorderRadius.circular(4),
                                           ),
@@ -462,10 +613,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                         sideTitles: SideTitles(
                                           showTitles: true,
                                           getTitlesWidget: (value, meta) {
-                                            final categoryName = weeklySummary.keys.elementAt(value.toInt());
+                                            final categoryName =
+                                            weeklySummary.keys.elementAt(value.toInt());
                                             return Padding(
                                               padding: const EdgeInsets.only(top: 8.0),
-                                              child: Text(categoryName, style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 9)),
+                                              child: Text(categoryName,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall!
+                                                      .copyWith(fontSize: 9)),
                                             );
                                           },
                                           reservedSize: 30,
@@ -475,16 +631,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                         sideTitles: SideTitles(
                                           showTitles: true,
                                           getTitlesWidget: (value, meta) {
-                                            return Text(_formatCurrency(value), style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 9));
+                                            return Text(_formatCurrency(value),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall!
+                                                    .copyWith(fontSize: 9));
                                           },
                                           reservedSize: 45,
                                         ),
                                       ),
-                                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                      topTitles:
+                                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                      rightTitles:
+                                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                     ),
                                     borderData: FlBorderData(show: false),
-                                    gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 10,
+                                    gridData: FlGridData(
+                                      show: true,
+                                      drawVerticalLine: false,
+                                      horizontalInterval: 10,
                                       getDrawingHorizontalLine: (value) => FlLine(
                                         color: Colors.grey.withOpacity(0.3),
                                         strokeWidth: 1,
@@ -506,32 +671,37 @@ class _HomeScreenState extends State<HomeScreen> {
                                 height: 250,
                                 child: PieChart(
                                   PieChartData(
-                                    sections: weeklySummary.entries.toList().asMap().entries.map((entry) {
+                                    sections: weeklySummary.entries
+                                        .toList()
+                                        .asMap()
+                                        .entries
+                                        .map((entry) {
                                       final index = entry.key;
                                       final mapEntry = entry.value;
-                                      final color = Colors.primaries[index % Colors.primaries.length];
-                                      final percentage = (mapEntry.value / totalWeekly * 100);
-                                      // Only show title if slice is significant enough, otherwise it clutters.
-                                      // You can adjust the 5.0% threshold.
+                                      final color = Colors
+                                          .primaries[index % Colors.primaries.length];
+                                      final percentage =
+                                      (mapEntry.value / totalWeekly * 100);
                                       final String titleText = percentage > 5.0
                                           ? '${mapEntry.key}\n${percentage.toStringAsFixed(1)}%'
-                                          : '${percentage.toStringAsFixed(1)}%'; // Show only percentage for very small slices
+                                          : '${percentage.toStringAsFixed(1)}%';
 
                                       return PieChartSectionData(
                                         color: color,
                                         value: mapEntry.value,
                                         title: titleText,
-                                        radius: 80, // Increased radius for more space
+                                        radius: 80,
                                         titleStyle: const TextStyle(
-                                          fontSize: 10, // Adjusted font size
+                                          fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
-                                        titlePositionPercentageOffset: 0.6, // Adjusted position further out
+                                        titlePositionPercentageOffset:
+                                        0.6,
                                       );
                                     }).toList(),
-                                    sectionsSpace: 4, // Increased space between sections for better visual separation
-                                    centerSpaceRadius: 50, // Increased center hole size
+                                    sectionsSpace: 4,
+                                    centerSpaceRadius: 50,
                                     borderData: FlBorderData(show: false),
                                   ),
                                 ),
@@ -557,7 +727,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('All Expenses', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                            const Text('All Expenses',
+                                style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.greenAccent)),
                             const SizedBox(height: 15),
                             ListView.builder(
                               shrinkWrap: true,
@@ -571,8 +745,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   child: ListTile(
                                     leading: CircleAvatar(
-                                      backgroundColor: Colors.deepPurpleAccent.withOpacity(0.2),
-                                      child: Icon(_getCategoryIcon(expense.category), color: Colors.deepPurpleAccent),
+                                      backgroundColor:
+                                      Colors.deepPurpleAccent.withOpacity(0.2),
+                                      child: Icon(_getCategoryIcon(expense.category),
+                                          color: Colors.deepPurpleAccent),
                                     ),
                                     title: Text(
                                       '${expense.category}: ${_formatCurrency(expense.amount)}',
@@ -613,11 +789,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Helper widget to build consistent summary cards
-  Widget _buildSummaryCard(String title, double total, Map<String, double> summary, Color titleColor) {
+  Widget _buildSummaryCard(String title, double total, Map<String, double> summary,
+      Color titleColor) {
     final sortedEntries = summary.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-
     return Card(
       elevation: 5,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -626,20 +801,27 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
+            Text(title,
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
             const SizedBox(height: 8),
             Text(
               _formatCurrency(total),
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.lightGreenAccent),
+              style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.lightGreenAccent),
             ),
             const SizedBox(height: 10),
+            // Display top 3 categories by amount
             ...sortedEntries.take(3).map((entry) => Text(
               '${entry.key}: ${_formatCurrency(entry.value)}',
               style: Theme.of(context).textTheme.bodyMedium,
             )),
+            // If there are more than 3 categories, show "..."
             if (sortedEntries.length > 3)
               Text(
-                'Other categories...',
+                '...',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
           ],

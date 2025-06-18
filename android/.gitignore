@@ -1,14 +1,68 @@
-gradle-wrapper.jar
-/.gradle
-/captures/
-/gradlew
-/gradlew.bat
-/local.properties
-GeneratedPluginRegistrant.java
-.cxx/
+# Miscellaneous common ignores
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+*.iml
+*.ipr
+*.iws
+# IntelliJ/Android Studio related
+.idea/
+.gradle/ # Global .gradle folder (if any in root, though usually user-home)
 
-# Remember to never publicly share your keystore.
-# See https://flutter.dev/to/reference-keystore
-key.properties
-**/*.keystore
-**/*.jks
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+
+
+# Firebase configuration
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+
+
+# Android-specific ignores (CRITICAL FOR YOUR CURRENT ISSUE)
+/android/app/build/ # Generated Android build output for app module
+/android/.gradle/   # <--- ADD THIS LINE: Local .gradle cache for the Android project
+/android/local.properties # <--- ADD THIS LINE: Android SDK local path config
+/android/app/src/main/java/ # <--- ADD THIS LINE: Often contains generated plugin code, ignore it if so
+/android/app/debug/ # Specific debug build folder
+/android/app/profile/ # Specific profile build folder
+/android/app/release/ # Specific release build folder
+
+# Gradle Wrapper files (these should be INCLUDED in Git, so NOT in .gitignore)
+#!/android/gradlew
+#!/android/gradlew.bat
+#!/android/gradle/wrapper/gradle-wrapper.jar
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Environment variables (if you use .env files)
+.env
+.env.*
+
