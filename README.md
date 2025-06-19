@@ -6,11 +6,29 @@ This is an app developed **for fun**, learning, and showcasing Flutter developme
 
 ## ✨ Features
 
--   **User Authentication:** Secure login/registration using Firebase Authentication (Email/Password).
 -   **Expense Tracking:** Add, view, and manage daily expenses.
 -   **Categorization:** Organize expenses by category.
 -   **Data Persistence:** Expense data is stored securely in Firebase Firestore.
--   **Cross-Platform:** Built with Flutter for Android, iOS, Web, and Desktop support.
+-   **Cross-Platform:** Built with Flutter for Android
+
+
+
+## 📊 Latest Updates
+
+I've recently enhanced the app with the following key features:
+
+### Monthly Budget Planning
+
+Users can now input their own **budget for a month**. A visual **bar chart** or **progress bar** (depending on implementation detail) visually indicates how much their expenses are affecting their current budget for that category within that specific month. This provides an immediate, clear overview of spending against planned budgets.
+
+### Dynamic Custom Expenses
+
+To offer greater flexibility, users can now add their **own custom expense types** for each category. This means you're no longer limited to predefined expense items but can tailor your spending descriptions to fit your specific needs, making expense tracking more personalized and accurate.
+
+---
+
+
+
 
 ## 🚀 Getting Started
 
