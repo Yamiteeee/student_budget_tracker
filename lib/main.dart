@@ -1,5 +1,5 @@
 // lib/main.dart
-//testing for git commit <-----
+//final push attemp
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
