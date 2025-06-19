@@ -7,7 +7,7 @@ import 'package:student_budget_tracker/services/firestore_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:student_budget_tracker/screens/reports_screen.dart';
 import 'package:student_budget_tracker/screens/budget_planner_screen.dart';
-import 'package:student_budget_tracker/models/category.dart'; // NEW: Import Category model
+import 'package:student_budget_tracker/models/category.dart'; // Import Category model
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -47,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showMessage(String message, {bool isError = false}) {
+    // Only show snackbar if the widget is still mounted
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -212,54 +214,138 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // NEW: Dialog to add a new category
-  Future<void> _showAddCategoryDialog() async {
+  // REPLACED: _showAddCategoryDialog is now _showManageCategoriesDialog
+  // This dialog now handles both adding and removing categories.
+  Future<void> _showManageCategoriesDialog() async {
     final TextEditingController newCategoryController = TextEditingController();
-    final String? newCategory = await showDialog<String>(
+
+    await showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Add New Category'),
-          content: TextField(
-            controller: newCategoryController,
-            decoration: const InputDecoration(hintText: 'Category Name'),
-            autofocus: true,
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(null),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final String categoryName = newCategoryController.text.trim();
-                if (categoryName.isNotEmpty) {
-                  Navigator.of(dialogContext).pop(categoryName);
-                } else {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text('Category name cannot be empty.'), backgroundColor: Colors.red),
-                  );
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
+        final FirestoreService fsService = _firestoreService;
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return AlertDialog(
+              title: const Text('Manage Categories'),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.8,
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Expanded(
+                      child: StreamBuilder<List<Category>>(
+                        stream: fsService.getCategories(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          if (snapshot.hasError) {
+                            print('Category Stream Error: ${snapshot.error}');
+                            return Center(child: Text('Error: ${snapshot.error}'));
+                          }
+                          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const Center(child: Text('No categories added yet. Add some below!'));
+                          }
+
+                          final categories = snapshot.data!;
+
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: categories.length,
+                            itemBuilder: (context, index) {
+                              final category = categories[index];
+                              return ListTile(
+                                title: Text(category.name),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () async {
+                                    final bool? confirmDelete = await showDialog<bool>(
+                                      context: context,
+                                      builder: (innerContext) => AlertDialog(
+                                        title: const Text('Delete Category?'),
+                                        content: Text('Are you sure you want to delete "${category.name}"?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(innerContext).pop(false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.of(innerContext).pop(true),
+                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirmDelete == true) {
+                                      try {
+                                        await fsService.removeCategory(category.id);
+                                        _showMessage('Category "${category.name}" removed!');
+                                        setState(() {}); // Refresh dialog list
+                                      } catch (e) {
+                                        String errorMessage = e.toString().split(':').last.trim();
+                                        _showMessage('Failed to remove category: $errorMessage', isError: true);
+                                      }
+                                    }
+                                  },
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const Divider(),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: TextField(
+                        controller: newCategoryController,
+                        decoration: const InputDecoration(
+                          hintText: 'New Category Name',
+                          border: OutlineInputBorder(),
+                        ),
+                        autofocus: false,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final String categoryName = newCategoryController.text.trim();
+                        if (categoryName.isNotEmpty) {
+                          try {
+                            await fsService.addCategory(categoryName);
+                            _showMessage('Category "$categoryName" added successfully!');
+                            newCategoryController.clear();
+                            setState(() {}); // Refresh dialog list
+                          } catch (e) {
+                            String errorMessage = e.toString().split(':').last.trim();
+                            _showMessage('Failed to add category: $errorMessage', isError: true);
+                          }
+                        } else {
+                          _showMessage('Category name cannot be empty.', isError: true);
+                        }
+                      },
+                      child: const Text('Add Category'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
-
-    if (newCategory != null && newCategory.isNotEmpty) {
-      try {
-        await _firestoreService.addCategory(newCategory);
-        _showMessage('Category "$newCategory" added successfully!');
-        setState(() {
-          _selectedCategory = newCategory; // Automatically select the newly added category
-        });
-      } catch (e) {
-        String errorMessage = e.toString().split(':').last.trim();
-        _showMessage('Failed to add category: $errorMessage', isError: true);
-      }
-    }
     newCategoryController.dispose();
   }
 
@@ -375,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 }
                                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                                   // Inform user to add a category if none exist
-                                  return const Text('No categories available. Please add one.');
+                                  return const Text('No categories available. Add with the "+" button.');
                                 }
 
                                 List<String> categoryNames = snapshot.data!.map((c) => c.name).toList();
@@ -429,8 +515,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             child: IconButton(
                               icon: const Icon(Icons.add, color: Colors.white),
-                              onPressed: _showAddCategoryDialog,
-                              tooltip: 'Add New Category',
+                              onPressed: _showManageCategoriesDialog, // Changed to call the new dialog
+                              tooltip: 'Manage Categories', // Updated tooltip
                             ),
                           ),
                         ],

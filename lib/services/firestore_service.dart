@@ -1,35 +1,30 @@
 // lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth to get current user ID
 import 'package:student_budget_tracker/models/expense.dart';
 import 'package:student_budget_tracker/models/budget.dart';
-import 'package:student_budget_tracker/models/category.dart'; // Import the new Category model
+import 'package:student_budget_tracker/models/category.dart'; // Import the Category model
 
 class FirestoreService {
-  final String userId;
+  final String userId; // Now truly relies on the userId passed in
   late final CollectionReference _expensesCollection;
   late final CollectionReference _budgetsCollection;
-  late final CollectionReference _categoriesCollection; // New collection reference for categories
+  late final CollectionReference _categoriesCollection; // Collection reference for global categories
 
   FirestoreService({required this.userId}) {
-    const String appId = 'student_budget_tracker_app';
+    const String appId = 'student_budget_tracker_app'; // Your defined app ID
 
-    _expensesCollection = FirebaseFirestore.instance
+    // User-specific collections
+    final userDocRef = FirebaseFirestore.instance
         .collection('artifacts')
         .doc(appId)
         .collection('users')
-        .doc(userId)
-        .collection('expenses');
+        .doc(userId);
 
-    _budgetsCollection = FirebaseFirestore.instance
-        .collection('artifacts')
-        .doc(appId)
-        .collection('users')
-        .doc(userId)
-        .collection('budgets');
+    _expensesCollection = userDocRef.collection('expenses');
+    _budgetsCollection = userDocRef.collection('budgets');
 
-    // Categories are stored globally for the app, not per user.
-    // Change this path if you want user-specific categories:
-    // .doc(userId).collection('categories');
+    // Global categories collection (as per your current setup)
     _categoriesCollection = FirebaseFirestore.instance
         .collection('artifacts')
         .doc(appId)
@@ -84,7 +79,7 @@ class FirestoreService {
     await _budgetsCollection.doc(budgetDocId).delete();
   }
 
-  // --- Category Operations (NEW) ---
+  // --- Category Operations ---
 
   /// Adds a new category to Firestore.
   /// Uses the category name as the document ID to prevent duplicates.
@@ -108,13 +103,54 @@ class FirestoreService {
     return _categoriesCollection.orderBy('name').snapshots().map((snapshot) {
       final categories = snapshot.docs.map((doc) => Category.fromFirestore(doc)).toList();
       // Add default categories if the collection is empty.
-      // This ensures a baseline set of categories is always present.
       if (categories.isEmpty) {
         _addDefaultCategoriesIfEmpty();
       }
       return categories;
     });
   }
+
+  /// Removes a category from Firestore by its ID (which is its name in your setup).
+  ///
+  /// IMPORTANT: This method now also attempts to delete associated budget and
+  /// expense entries for the *current user* to maintain data consistency.
+  Future<void> removeCategory(String categoryId) async {
+    try {
+      // Start a Firestore batch write for atomicity
+      final WriteBatch batch = FirebaseFirestore.instance.batch();
+
+      // 1. Delete the category itself from the global collection
+      batch.delete(_categoriesCollection.doc(categoryId));
+
+      // 2. Query and delete associated budget entries for the current user
+      final budgetsToDelete = await _budgetsCollection
+          .where('category', isEqualTo: categoryId)
+          .get();
+      for (var doc in budgetsToDelete.docs) {
+        batch.delete(doc.reference);
+      }
+      print('Found ${budgetsToDelete.docs.length} budgets to delete for category "$categoryId".');
+
+
+      // 3. Query and delete associated expense entries for the current user
+      final expensesToDelete = await _expensesCollection
+          .where('category', isEqualTo: categoryId)
+          .get();
+      for (var doc in expensesToDelete.docs) {
+        batch.delete(doc.reference);
+      }
+      print('Found ${expensesToDelete.docs.length} expenses to delete for category "$categoryId".');
+
+      // Commit the batch operation
+      await batch.commit();
+
+      print('Category "$categoryId" and all associated budgets/expenses removed successfully.');
+    } catch (e) {
+      print('Error removing category "$categoryId" or associated data: $e');
+      rethrow; // Re-throw to allow UI to handle the error
+    }
+  }
+
 
   /// Private helper method to populate default categories if none exist.
   Future<void> _addDefaultCategoriesIfEmpty() async {
