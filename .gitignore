@@ -13,10 +13,10 @@
 migrate_working_dir/
 
 # IntelliJ related
-*.iml
+*.iml              # Catches module files at root and subdirectories
 *.ipr
 *.iws
-.idea/
+.idea/             # Important for Android Studio project configs
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
@@ -31,7 +31,7 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+/build/            # Catches the main Flutter build directory
 
 # Symbolication related
 app.*.symbols
@@ -40,9 +40,17 @@ app.*.symbols
 app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+/android/.gradle/            # Gradle's own cache/output within the android module
+/android/build/              # General build output for the android module
+/android/local.properties    # Contains SDK paths, should be ignored
+/android/*.iml               # Android module files
+/android/app/build/          # Specific app module build output
+/android/app/*.iml           # App module iml file
+
+
+# /android/app/debug
+# /android/app/profile
+# /android/app/release
 
 
 # Firebase configuration
