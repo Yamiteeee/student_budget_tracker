@@ -10,22 +10,29 @@ This is an app developed **for fun**, learning, and showcasing Flutter developme
 -   **Categorization:** Organize expenses by category.
 -   **Data Persistence:** Expense data is stored securely in Firebase Firestore.
 -   **Cross-Platform:** Built with Flutter for Android
+-   **Monthly Budget Planning
+-   **Dynamic Custom Expenses
 
 
 
 ## 📊 Latest Updates
 
-I've recently enhanced the app with the following key features:
+I've recently enhanced this boilerplate with the following improvements:
 
-### Monthly Budget Planning
+Unified Category Management
+The app now features a single, intuitive dialog for managing both adding and removing categories. This streamlines the process of customizing your expense categories, making it easier to keep your budget organized.
 
-Users can now input their own **budget for a month**. A visual **bar chart** or **progress bar** (depending on implementation detail) visually indicates how much their expenses are affecting their current budget for that category within that specific month. This provides an immediate, clear overview of spending against planned budgets.
+Cascading Category Deletion
+When a category is removed, the system now intelligently identifies and automatically deletes all associated budget and expense entries for the current user. This ensures data consistency and prevents orphaned records in your Firestore database.
 
-### Dynamic Custom Expenses
+Enhanced UI/UX for Dialogs
+Dialogs for adding/removing categories and confirming deletions have been refined for better visual presentation and user interaction, including:
 
-To offer greater flexibility, users can now add their **own custom expense types** for each category. This means you're no longer limited to predefined expense items but can tailor your spending descriptions to fit your specific needs, making expense tracking more personalized and accurate.
+Clearer display of existing categories.
 
----
+Improved error handling and feedback messages.
+
+Robustness against "Red Screen of Death" errors on dialog dismissal.
 
 
 
