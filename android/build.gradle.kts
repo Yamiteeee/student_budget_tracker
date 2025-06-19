@@ -5,7 +5,7 @@ plugins {
     // The versions here are common; your existing project might use slightly different ones
     // You can usually find the exact versions in an existing Flutter project's android/build.gradle.kts
     // If you have trouble building with these, we can adjust versions.
-    id("com.android.application") version "8.7.3" apply false // Android Gradle Plugin
+    id("com.android.application") version "8.10.1" apply false // Android Gradle Plugin
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false // Kotlin Gradle Plugin
 
     // THIS IS THE CRITICAL LINE FOR FIREBASE
