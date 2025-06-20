@@ -17,7 +17,7 @@ This is an app developed **for fun**, learning, and showcasing Flutter developme
 
 ## 📊 Latest Updates
 
-I've recently enhanced this boilerplate with the following improvements:
+I've recently enhanced this Application with the following improvements:
 
 Unified Category Management
 The app now features a single, intuitive dialog for managing both adding and removing categories. This streamlines the process of customizing your expense categories, making it easier to keep your budget organized.
